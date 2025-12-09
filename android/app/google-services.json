@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "533938075764",
+    "project_id": "synthesia-18dc7",
+    "storage_bucket": "synthesia-18dc7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533938075764:android:20a903715ee50d9903b921",
+        "android_client_info": {
+          "package_name": "com.example.synthesia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALQOM48dCY9odj8i7C52OtvYv_naoJ9BQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
