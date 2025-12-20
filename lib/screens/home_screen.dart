@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../widgets/profile_picture_widget.dart';
 import 'welcome_screen.dart';
 import 'voice_assistant_screen.dart';
 
@@ -409,30 +410,11 @@ class _HomeScreenState extends State<HomeScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                          // Profile Picture
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF6366F1,
-                                  ).withOpacity(0.4),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.person_rounded,
-                              color: Colors.white,
-                              size: 40,
-                            ),
+                          // Profile Picture with edit button
+                          const LocalProfilePictureWidget(
+                            size: 80,
+                            showEditButton: true,
+                            gradient: [Color(0xFF6366F1), Color(0xFFEC4899)],
                           ),
 
                           const SizedBox(height: 16),
