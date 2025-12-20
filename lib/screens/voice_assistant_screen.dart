@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../services/groq_service.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});
@@ -10,15 +13,28 @@ class VoiceAssistantScreen extends StatefulWidget {
 
 class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     with TickerProviderStateMixin {
+  final GroqService _groqService = GroqService();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _flutterTts = FlutterTts();
+  final TextEditingController _textController = TextEditingController();
+
   bool _isListening = false;
+  bool _isProcessing = false;
+  bool _speechEnabled = false;
   String _recognizedText = '';
   String _responseText = '';
+
   late AnimationController _pulseController;
   late AnimationController _waveController;
+
+  final List<Map<String, String>> _conversationHistory = [];
 
   @override
   void initState() {
     super.initState();
+    _initSpeech();
+    _initTts();
+
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -30,32 +46,131 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     )..repeat();
   }
 
+  Future<void> _initSpeech() async {
+    _speechEnabled = await _speech.initialize(
+      onError: (error) {
+        setState(() {
+          _isListening = false;
+          _recognizedText = '';
+        });
+        _showError('Speech recognition error: ${error.errorMsg}');
+      },
+      onStatus: (status) {
+        if (status == 'done' || status == 'notListening') {
+          setState(() => _isListening = false);
+        }
+      },
+    );
+    setState(() {});
+  }
+
+  Future<void> _initTts() async {
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
     _waveController.dispose();
+    _textController.dispose();
+    _speech.stop();
+    _flutterTts.stop();
     super.dispose();
   }
 
-  void _toggleListening() {
-    setState(() {
-      _isListening = !_isListening;
-      if (_isListening) {
-        _recognizedText = 'Listening...';
+  void _toggleListening() async {
+    if (!_speechEnabled) {
+      _showError('Speech recognition not available. Using text input instead.');
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      setState(() {
+        _isListening = true;
+        _recognizedText = '';
         _responseText = '';
-        // Simulate recognition after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () {
-          if (_isListening) {
-            setState(() {
-              _recognizedText = 'How can AI help me with stock predictions?';
-              _responseText =
-                  'I can help you analyze market trends, predict stock movements using advanced algorithms, and provide insights based on historical data. Would you like to explore our Stock Prediction model?';
-              _isListening = false;
-            });
+      });
+
+      await _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _recognizedText = result.recognizedWords;
+          });
+
+          // When user stops speaking, process the message
+          if (result.finalResult) {
+            _processMessage(_recognizedText);
           }
-        });
-      }
+        },
+        listenFor: const Duration(seconds: 10),
+        pauseFor: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  Future<void> _processMessage(String message) async {
+    if (message.isEmpty) return;
+
+    setState(() {
+      _isProcessing = true;
+      _isListening = false;
     });
+
+    try {
+      // Get AI response
+      final response = await _groqService.sendMessage(message);
+
+      setState(() {
+        _responseText = response;
+        _conversationHistory.insert(0, {'user': message, 'ai': response});
+        _isProcessing = false;
+      });
+
+      // Speak the response
+      await _flutterTts.speak(response);
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      _showError(e.toString());
+    }
+  }
+
+  Future<void> _handleQuickCommand(String command) async {
+    setState(() {
+      _recognizedText = command;
+      _isProcessing = true;
+    });
+
+    try {
+      final response = await _groqService.getQuickResponse(command);
+
+      setState(() {
+        _responseText = response;
+        _conversationHistory.insert(0, {'user': command, 'ai': response});
+        _isProcessing = false;
+      });
+
+      await _flutterTts.speak(response);
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      _showError(e.toString());
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -93,12 +208,52 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Text(
-                      'Voice Assistant',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Voice Assistant',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Powered by Groq AI',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF10B981), Color(0xFF059669)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.flash_on, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'FAST',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -110,8 +265,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
                     children: [
-                      const SizedBox(height: 40),
-
                       // Animated Microphone
                       GestureDetector(
                         onTap: _toggleListening,
@@ -119,12 +272,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                           animation: _pulseController,
                           builder: (context, child) {
                             return Container(
-                              width: 200,
-                              height: 200,
+                              width: 180,
+                              height: 180,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(
-                                  colors: _isListening
+                                  colors: _isListening || _isProcessing
                                       ? [
                                           const Color(0xFFEC4899),
                                           const Color(0xFFF43F5E),
@@ -137,7 +290,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                                 boxShadow: [
                                   BoxShadow(
                                     color:
-                                        (_isListening
+                                        (_isListening || _isProcessing
                                                 ? const Color(0xFFEC4899)
                                                 : const Color(0xFF6366F1))
                                             .withOpacity(
@@ -151,37 +304,52 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                                   ),
                                 ],
                               ),
-                              child: Icon(
-                                _isListening
-                                    ? Icons.mic_rounded
-                                    : Icons.mic_none_rounded,
-                                size: 80,
-                                color: Colors.white,
-                              ),
+                              child: _isProcessing
+                                  ? const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 3,
+                                      ),
+                                    )
+                                  : Icon(
+                                      _isListening
+                                          ? Icons.mic_rounded
+                                          : Icons.mic_none_rounded,
+                                      size: 80,
+                                      color: Colors.white,
+                                    ),
                             );
                           },
                         ),
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 32),
 
                       // Status Text
                       Text(
-                        _isListening ? 'Listening...' : 'Tap to speak',
+                        _isProcessing
+                            ? 'Processing...'
+                            : _isListening
+                            ? 'Listening...'
+                            : 'Tap to speak',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: _isListening
+                          color: _isListening || _isProcessing
                               ? const Color(0xFFEC4899)
                               : const Color(0xFF94A3B8),
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
                       Text(
-                        _isListening
-                            ? 'Speak now, I\'m listening...'
+                        _isProcessing
+                            ? 'Getting AI response...'
+                            : _isListening
+                            ? _recognizedText.isEmpty
+                                  ? 'Speak now...'
+                                  : _recognizedText
                             : 'Ask me anything about AI models',
                         style: const TextStyle(
                           fontSize: 14,
@@ -191,8 +359,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                       ),
 
                       if (_isListening) ...[
-                        const SizedBox(height: 40),
-                        // Sound Wave Animation
+                        const SizedBox(height: 32),
                         AnimatedBuilder(
                           animation: _waveController,
                           builder: (context, child) {
@@ -204,134 +371,37 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                         ),
                       ],
 
-                      const SizedBox(height: 60),
-
-                      // Recognized Text
-                      if (_recognizedText.isNotEmpty &&
-                          _recognizedText != 'Listening...') ...[
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFF334155)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF6366F1),
-                                      Color(0xFF8B5CF6),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.person_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'You',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF94A3B8),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _recognizedText,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Response Text
-                      if (_responseText.isNotEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFEC4899), Color(0xFFF43F5E)],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFEC4899).withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.smart_toy_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'AI Assistant',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white.withOpacity(0.8),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _responseText,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
                       const SizedBox(height: 40),
 
-                      // Quick Actions
+                      // Conversation History
+                      if (_conversationHistory.isNotEmpty) ...[
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Conversation',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._conversationHistory.map(
+                          (conv) => Column(
+                            children: [
+                              _buildMessageBubble(conv['user']!, isUser: true),
+                              const SizedBox(height: 12),
+                              _buildMessageBubble(conv['ai']!, isUser: false),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 20),
+
+                      // Quick Commands
                       const Text(
                         'Quick Commands',
                         style: TextStyle(
@@ -357,6 +427,77 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
                   ),
                 ),
               ),
+
+              // Text Input Area
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1E293B),
+                  border: Border(top: BorderSide(color: Color(0xFF334155))),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: TextField(
+                          controller: _textController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: 'Type your message...',
+                            hintStyle: TextStyle(color: Color(0xFF64748B)),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
+                          onSubmitted: (value) {
+                            if (value.trim().isNotEmpty) {
+                              _processMessage(value.trim());
+                              _textController.clear();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        if (_textController.text.trim().isNotEmpty) {
+                          _processMessage(_textController.text.trim());
+                          _textController.clear();
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6366F1).withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -364,14 +505,62 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     );
   }
 
+  Widget _buildMessageBubble(String text, {required bool isUser}) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: isUser
+              ? const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                )
+              : null,
+          color: isUser ? null : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: isUser ? null : Border.all(color: const Color(0xFF334155)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? Colors.white.withOpacity(0.2)
+                    : const Color(0xFFEC4899).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isUser ? Icons.person_rounded : Icons.smart_toy_rounded,
+                color: isUser ? Colors.white : const Color(0xFFEC4899),
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isUser ? Colors.white : const Color(0xFFE2E8F0),
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickCommand(String text) {
     return InkWell(
-      onTap: () {
-        setState(() {
-          _recognizedText = text;
-          _responseText = 'Processing your question about "${text}"...';
-        });
-      },
+      onTap: () => _handleQuickCommand(text),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
