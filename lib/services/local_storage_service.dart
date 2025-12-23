@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:html' as html;
+/*import 'dart:convert';
+//import 'dart:html' as html;
 import 'package:image_picker/image_picker.dart';
 
 class LocalStorageService {
@@ -53,3 +53,4 @@ class LocalStorageService {
     }
   }
 }
+*/

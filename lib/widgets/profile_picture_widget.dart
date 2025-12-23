@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 import '../services/local_storage_service.dart';
 
 class LocalProfilePictureWidget extends StatefulWidget {
@@ -161,4 +161,4 @@ class _LocalProfilePictureWidgetState extends State<LocalProfilePictureWidget> {
       ],
     );
   }
-}
+}*/

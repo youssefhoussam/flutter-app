@@ -31,6 +31,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86_64"))
+        }
     }
 
     buildTypes {
@@ -40,8 +43,24 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    configurations {
+        create("all") {
+            exclude(group = "com.google.android.gms", module = "play-services-measurement-base")
+        }
+    }
+    packaging {
+        resources {
+            excludes += "META-INF/androidx.*"
+        }
+    }
+
 }
 
 flutter {
     source = "../.."
+}
+dependencies {
+    
+    
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
 }
