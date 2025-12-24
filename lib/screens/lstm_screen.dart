@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/lstm_service.dart';
+import 'dart:math';
 
 class LSTMScreen extends StatefulWidget {
   const LSTMScreen({super.key});
@@ -15,60 +16,28 @@ class _LSTMScreenState extends State<LSTMScreen> {
   bool _isProcessing = false;
   Map<String, dynamic>? _result;
 
-  // Sample historical data
-  final List<double> _samplePrices = [
-    150.0,
-    152.5,
-    151.0,
-    153.2,
-    155.0,
-    154.3,
-    156.1,
-    158.0,
-    157.5,
-    159.3,
-    161.0,
-    160.2,
-    162.5,
-    164.0,
-    163.5,
-    165.8,
-    167.2,
-    166.5,
-    168.9,
-    170.1,
-    169.5,
-    171.3,
-    173.0,
-    172.4,
-    174.5,
-    176.2,
-    175.8,
-    177.9,
-    179.5,
-    178.9,
-  ];
+  List<double> _generateRandomPrices({
+    int length = 60,
+    double startPrice = 150,
+  }) {
+    final random = Random();
+    final prices = <double>[];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadModel();
-    _pricesController.text = _samplePrices.join(', ');
-  }
+    double current = startPrice;
 
-  Future<void> _loadModel() async {
-    try {
-      await _lstmService.loadModel();
-    } catch (e) {
-      _showError(e.toString());
+    for (int i = 0; i < length; i++) {
+      final change = (random.nextDouble() * 4 - 2) / 100;
+      current += current * change;
+      prices.add(double.parse(current.toStringAsFixed(2)));
     }
+
+    return prices;
   }
 
   Future<void> _predict() async {
     setState(() => _isProcessing = true);
 
     try {
-      // Parse prices from text input
       List<String> priceStrings = _pricesController.text.split(',');
       List<double> prices = priceStrings
           .map((s) => double.tryParse(s.trim()))
@@ -89,10 +58,6 @@ class _LSTMScreenState extends State<LSTMScreen> {
       setState(() => _isProcessing = false);
       _showError(e.toString());
     }
-  }
-
-  void _useSampleData() {
-    _pricesController.text = _samplePrices.join(', ');
   }
 
   void _showError(String message) {
@@ -273,7 +238,12 @@ class _LSTMScreenState extends State<LSTMScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: _useSampleData,
+                              onPressed: () {
+                                final prices = _generateRandomPrices(
+                                  length: 60,
+                                );
+                                _pricesController.text = prices.join(', ');
+                              },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
@@ -411,6 +381,24 @@ class _LSTMScreenState extends State<LSTMScreen> {
                                   color: Colors.white.withOpacity(0.8),
                                 ),
                               ),
+                              if (_result!.containsKey('predictedValue')) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Predicted: ${_result!['predictedValue'].toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  'Last: ${_result!['lastValue'].toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 20),
                               Container(
                                 padding: const EdgeInsets.all(16),

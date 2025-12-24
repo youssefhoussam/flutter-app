@@ -1,130 +1,122 @@
-import 'package:flutter/services.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class LSTMService {
-  Interpreter? _interpreter;
-  List<String> _labels = [];
+  // CHANGE THIS if needed (emulator vs real device)
+  static const String _baseUrl = 'http://10.0.2.2:8000';
+  // For real device on same network:
+  // http://YOUR_PC_IP:8000
+
   bool _isLoaded = false;
 
   Future<void> loadModel() async {
-    try {
-      _interpreter = await Interpreter.fromAsset(
-        'assets/models/lstm_model.tflite',
-      );
-
-      final labelsData = await rootBundle.loadString(
-        'assets/labels/lstm_labels.txt',
-      );
-      _labels = labelsData
-          .split('\n')
-          .where((label) => label.isNotEmpty)
-          .toList();
-
-      _isLoaded = true;
-      print('LSTM Model loaded successfully');
-    } catch (e) {
-      print('Error loading LSTM model: $e');
-      throw 'Failed to load LSTM model';
-    }
+    // No local model to load anymore
+    _isLoaded = true;
   }
 
-  // Predict stock trend from historical data
-  // Input: List of stock prices (e.g., last 30 days)
-  Future<Map<String, dynamic>> predictStockTrend(
-    List<double> stockPrices,
-  ) async {
+  Future<Map<String, dynamic>> predictStockTrend(List<double> prices) async {
     if (!_isLoaded) {
       await loadModel();
     }
 
+    if (prices.length < 60) {
+      throw 'Please provide at least 60 price values';
+    }
+
+    // Use the LAST 60 values
+    final List<double> sequence = prices.sublist(prices.length - 60);
+
     try {
-      // Normalize stock prices (you may need to adjust this based on your model)
-      List<double> normalizedPrices = _normalizeData(stockPrices);
+      final response = await http.post(
+        Uri.parse('$_baseUrl/predict'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'sequence': sequence}),
+      );
 
-      // Prepare input based on your LSTM model's expected shape
-      // Common shape: [1, sequence_length, 1] or [1, sequence_length, features]
-      var input = [
-        normalizedPrices.map((price) => [price]).toList(),
-      ];
-
-      // Prepare output buffer
-      var output = List.filled(
-        _labels.length,
-        0.0,
-      ).reshape([1, _labels.length]);
-
-      // Run inference
-      _interpreter!.run(input, output);
-
-      final predictions = output[0] as List<double>;
-
-      // Find the highest probability
-      double maxScore = predictions[0];
-      int maxIndex = 0;
-      for (int i = 1; i < predictions.length; i++) {
-        if (predictions[i] > maxScore) {
-          maxScore = predictions[i];
-          maxIndex = i;
-        }
+      if (response.statusCode != 200) {
+        throw 'Server error (${response.statusCode})';
       }
 
-      // Create prediction result
-      Map<String, double> allPredictions = {};
-      for (int i = 0; i < predictions.length; i++) {
-        allPredictions[_labels[i]] = predictions[i] * 100;
-      }
+      final data = jsonDecode(response.body);
+      final double predictedValue = data['prediction'];
+
+      final double lastValue = prices.last;
+
+      // Map regression output → trend
+      final _TrendResult trend = _mapPrediction(predictedValue, lastValue);
 
       return {
-        'prediction': _labels[maxIndex],
-        'confidence': maxScore * 100,
-        'allPredictions': allPredictions,
-        'recommendations': _getRecommendation(
-          _labels[maxIndex],
-          maxScore * 100,
-        ),
+        'prediction': trend.label,
+        'confidence': trend.confidence,
+        'allPredictions': trend.breakdown,
+        'predictedValue': predictedValue,
+        'lastValue': lastValue,
+        'recommendations': _getRecommendation(trend.label, trend.confidence),
       };
     } catch (e) {
-      print('Error during prediction: $e');
       throw 'Prediction failed: $e';
     }
   }
 
-  // Normalize data to range [0, 1]
-  List<double> _normalizeData(List<double> data) {
-    if (data.isEmpty) return [];
+  // ---------- BUSINESS LOGIC (UI-FRIENDLY) ----------
 
-    double min = data.reduce((a, b) => a < b ? a : b);
-    double max = data.reduce((a, b) => a > b ? a : b);
+  _TrendResult _mapPrediction(double predicted, double last) {
+    final double diffPercent = ((predicted - last) / last) * 100;
 
-    if (max == min) return List.filled(data.length, 0.5);
+    String label;
+    double confidence;
 
-    return data.map((value) => (value - min) / (max - min)).toList();
+    if (diffPercent > 1.0) {
+      label = 'Buy';
+      confidence = (diffPercent.abs() * 10).clamp(60, 95);
+    } else if (diffPercent < -1.0) {
+      label = 'Sell';
+      confidence = (diffPercent.abs() * 10).clamp(60, 95);
+    } else {
+      label = 'Hold';
+      confidence = 60;
+    }
+
+    return _TrendResult(
+      label: label,
+      confidence: confidence,
+      breakdown: {
+        'Buy': label == 'Buy' ? confidence : 100 - confidence,
+        'Sell': label == 'Sell' ? confidence : 100 - confidence,
+        'Hold': label == 'Hold' ? confidence : 100 - confidence,
+      },
+    );
   }
 
   String _getRecommendation(String prediction, double confidence) {
     if (prediction == 'Buy') {
-      if (confidence > 80) {
-        return 'Strong buy signal. Market shows positive momentum.';
-      } else if (confidence > 60) {
-        return 'Moderate buy signal. Consider entering position.';
-      } else {
-        return 'Weak buy signal. Monitor closely before acting.';
-      }
+      return confidence > 80
+          ? 'Strong upward trend detected. Consider buying.'
+          : 'Moderate upward trend. Monitor closely.';
     } else if (prediction == 'Sell') {
-      if (confidence > 80) {
-        return 'Strong sell signal. Consider taking profits.';
-      } else if (confidence > 60) {
-        return 'Moderate sell signal. Review your position.';
-      } else {
-        return 'Weak sell signal. Keep monitoring.';
-      }
+      return confidence > 80
+          ? 'Strong downward trend detected. Consider selling.'
+          : 'Moderate downward trend. Review your position.';
     } else {
-      // Hold
-      return 'Market is stable. Maintain current position and monitor trends.';
+      return 'Market appears stable. Holding is recommended.';
     }
   }
 
   void dispose() {
-    _interpreter?.close();
+    // Nothing to dispose anymore
   }
+}
+
+// ---------- INTERNAL HELPER CLASS ----------
+
+class _TrendResult {
+  final String label;
+  final double confidence;
+  final Map<String, double> breakdown;
+
+  _TrendResult({
+    required this.label,
+    required this.confidence,
+    required this.breakdown,
+  });
 }

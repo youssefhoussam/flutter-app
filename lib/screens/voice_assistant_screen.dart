@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../services/groq_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});
@@ -32,7 +33,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   @override
   void initState() {
     super.initState();
-    _initSpeech();
+    _requestPermissions(); // This will call _initSpeech if permission granted
     _initTts();
 
     _pulseController = AnimationController(
@@ -46,9 +47,23 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     )..repeat();
   }
 
+  Future<void> _requestPermissions() async {
+    final status = await Permission.microphone.request();
+    if (status.isDenied || status.isPermanentlyDenied) {
+      if (mounted) {
+        _showError(
+          'Microphone permission denied. Please enable it in settings.',
+        );
+      }
+    } else if (status.isGranted) {
+      await _initSpeech();
+    }
+  }
+
   Future<void> _initSpeech() async {
     _speechEnabled = await _speech.initialize(
       onError: (error) {
+        if (!mounted) return;
         setState(() {
           _isListening = false;
           _recognizedText = '';
@@ -56,12 +71,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
         _showError('Speech recognition error: ${error.errorMsg}');
       },
       onStatus: (status) {
+        if (!mounted) return;
         if (status == 'done' || status == 'notListening') {
           setState(() => _isListening = false);
         }
       },
     );
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _initTts() async {
@@ -89,21 +105,23 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
 
     if (_isListening) {
       await _speech.stop();
-      setState(() => _isListening = false);
+      if (mounted) setState(() => _isListening = false);
     } else {
-      setState(() {
-        _isListening = true;
-        _recognizedText = '';
-        _responseText = '';
-      });
+      if (mounted) {
+        setState(() {
+          _isListening = true;
+          _recognizedText = '';
+          _responseText = '';
+        });
+      }
 
       await _speech.listen(
         onResult: (result) {
+          if (!mounted) return;
           setState(() {
             _recognizedText = result.recognizedWords;
           });
 
-          // When user stops speaking, process the message
           if (result.finalResult) {
             _processMessage(_recognizedText);
           }
@@ -117,52 +135,59 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   Future<void> _processMessage(String message) async {
     if (message.isEmpty) return;
 
-    setState(() {
-      _isProcessing = true;
-      _isListening = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isProcessing = true;
+        _isListening = false;
+      });
+    }
 
     try {
-      // Get AI response
       final response = await _groqService.sendMessage(message);
 
-      setState(() {
-        _responseText = response;
-        _conversationHistory.insert(0, {'user': message, 'ai': response});
-        _isProcessing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _responseText = response;
+          _conversationHistory.insert(0, {'user': message, 'ai': response});
+          _isProcessing = false;
+        });
+      }
 
-      // Speak the response
       await _flutterTts.speak(response);
     } catch (e) {
-      setState(() => _isProcessing = false);
+      if (mounted) setState(() => _isProcessing = false);
       _showError(e.toString());
     }
   }
 
   Future<void> _handleQuickCommand(String command) async {
-    setState(() {
-      _recognizedText = command;
-      _isProcessing = true;
-    });
+    if (mounted) {
+      setState(() {
+        _recognizedText = command;
+        _isProcessing = true;
+      });
+    }
 
     try {
       final response = await _groqService.getQuickResponse(command);
 
-      setState(() {
-        _responseText = response;
-        _conversationHistory.insert(0, {'user': command, 'ai': response});
-        _isProcessing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _responseText = response;
+          _conversationHistory.insert(0, {'user': command, 'ai': response});
+          _isProcessing = false;
+        });
+      }
 
       await _flutterTts.speak(response);
     } catch (e) {
-      setState(() => _isProcessing = false);
+      if (mounted) setState(() => _isProcessing = false);
       _showError(e.toString());
     }
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

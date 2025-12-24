@@ -6,6 +6,7 @@ import 'voice_assistant_screen.dart';
 import 'cnn_screen.dart';
 import 'ann_screen.dart';
 import 'lstm_screen.dart';
+import 'rag_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -719,6 +720,8 @@ class _HomeScreenState extends State<HomeScreen>
       screen = const ANNScreen();
     } else if (model.name == 'Stock Prediction') {
       screen = const LSTMScreen();
+    } else if (model.name == 'RAG Model') {
+      screen = const RAGScreen();
     }
 
     return Padding(
