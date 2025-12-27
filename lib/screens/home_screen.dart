@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-// import '../widgets/local_profile_picture_widget.dart'; // Commented out for mobile
 import 'welcome_screen.dart';
 import 'voice_assistant_screen.dart';
 import 'cnn_screen.dart';
@@ -18,34 +17,73 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final authService = AuthService();
-  bool _isModelsExpanded = false;
   bool _isSidebarVisible = false;
   late AnimationController _animationController;
 
+  // Mock usage data - you can replace with real data from local storage
+  final int _totalPredictions = 247;
+  final int _modelsUsed = 4;
+  final int _todayUsage = 12;
+
+  final List<Map<String, dynamic>> _recentActivity = [
+    {
+      'model': 'CNN Model',
+      'action': 'Image Classification',
+      'time': '2 hours ago',
+      'icon': Icons.image_outlined,
+      'color': Color(0xFF8B5CF6),
+    },
+    {
+      'model': 'Stock Prediction',
+      'action': 'Market Analysis',
+      'time': '5 hours ago',
+      'icon': Icons.show_chart_rounded,
+      'color': Color(0xFFEC4899),
+    },
+    {
+      'model': 'Voice Assistant',
+      'action': 'Voice Query',
+      'time': 'Yesterday',
+      'icon': Icons.mic_rounded,
+      'color': Color(0xFFF43F5E),
+    },
+    {
+      'model': 'RAG Model',
+      'action': 'Document Q&A',
+      'time': '2 days ago',
+      'icon': Icons.auto_awesome_rounded,
+      'color': Color(0xFF10B981),
+    },
+  ];
+
   final List<AIModel> _models = [
     AIModel(
-      name: 'ANN Model',
-      description: 'Artificial Neural Network',
-      icon: Icons.hub_rounded,
-      gradient: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-    ),
-    AIModel(
       name: 'CNN Model',
-      description: 'Convolutional Neural Network',
+      description: 'Image Classification',
       icon: Icons.image_outlined,
       gradient: const [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+      usageCount: 89,
+    ),
+    AIModel(
+      name: 'ANN Model',
+      description: 'Pattern Recognition',
+      icon: Icons.hub_rounded,
+      gradient: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+      usageCount: 67,
     ),
     AIModel(
       name: 'Stock Prediction',
-      description: 'Market Forecasting AI',
+      description: 'Market Forecasting',
       icon: Icons.show_chart_rounded,
       gradient: const [Color(0xFFEC4899), Color(0xFFF43F5E)],
+      usageCount: 54,
     ),
     AIModel(
       name: 'RAG Model',
-      description: 'Retrieval-Augmented Generation',
+      description: 'Document Q&A',
       icon: Icons.auto_awesome_rounded,
       gradient: const [Color(0xFF10B981), Color(0xFF3B82F6)],
+      usageCount: 37,
     ),
   ];
 
@@ -68,6 +106,23 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _isSidebarVisible = !_isSidebarVisible;
     });
+  }
+
+  void _navigateToModel(String modelName) {
+    Widget? screen;
+    if (modelName == 'CNN Model') {
+      screen = const CNNScreen();
+    } else if (modelName == 'ANN Model') {
+      screen = const ANNScreen();
+    } else if (modelName == 'Stock Prediction') {
+      screen = const LSTMScreen();
+    } else if (modelName == 'RAG Model') {
+      screen = const RAGScreen();
+    }
+
+    if (screen != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => screen!));
+    }
   }
 
   @override
@@ -96,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen>
                     padding: const EdgeInsets.all(20.0),
                     child: Row(
                       children: [
-                        // Menu Button
                         IconButton(
                           onPressed: _toggleSidebar,
                           icon: Container(
@@ -124,14 +178,39 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
-                          child: Text(
-                            'Synthesia AI',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Dashboard',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'Welcome back, ${user?.email?.split('@')[0] ?? 'User'}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.white,
+                            size: 24,
                           ),
                         ),
                       ],
@@ -145,225 +224,373 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Main Welcome Header
-                          ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
-                            ).createShader(bounds),
-                            child: Text(
-                              'Welcome to Synthesia AI',
-                              style: TextStyle(
-                                fontSize: isMobile ? 32 : 48,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Description
-                          Text(
-                            'Your Advanced AI Models Platform',
-                            style: TextStyle(
-                              fontSize: isMobile ? 18 : 24,
-                              color: const Color(0xFF94A3B8),
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-
-                          const SizedBox(height: 40),
-
-                          // Feature Cards
+                          // Overview Banner
                           Container(
-                            padding: EdgeInsets.all(isMobile ? 20 : 32),
+                            padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B).withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: const Color(0xFF334155),
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF6366F1),
+                                  Color(0xFF8B5CF6),
+                                  Color(0xFFEC4899),
+                                ],
                               ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF6366F1,
+                                  ).withOpacity(0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFF6366F1),
-                                            Color(0xFF8B5CF6),
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.rocket_launch_rounded,
-                                        color: Colors.white,
-                                        size: 28,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Text(
-                                        'What You Can Do',
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome Back!',
                                         style: TextStyle(
-                                          fontSize: isMobile ? 22 : 28,
+                                          fontSize: 24,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
                                       ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'You have completed $_totalPredictions predictions across $_modelsUsed AI models',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withOpacity(0.9),
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(
+                                                0.2,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.trending_up_rounded,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  '$_todayUsage today',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(
+                                                0.2,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'All active',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!isMobile)
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 32),
-
-                                _buildFeatureItem(
-                                  icon: Icons.hub_rounded,
-                                  title: 'Neural Network Processing',
-                                  description:
-                                      'Leverage powerful ANN models for advanced pattern recognition and data analysis',
-                                  gradient: const [
-                                    Color(0xFF6366F1),
-                                    Color(0xFF8B5CF6),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                _buildFeatureItem(
-                                  icon: Icons.image_outlined,
-                                  title: 'Image Analysis with CNN',
-                                  description:
-                                      'Process and analyze images using state-of-the-art convolutional neural networks',
-                                  gradient: const [
-                                    Color(0xFF8B5CF6),
-                                    Color(0xFFEC4899),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                _buildFeatureItem(
-                                  icon: Icons.show_chart_rounded,
-                                  title: 'Market Predictions',
-                                  description:
-                                      'Get accurate stock market forecasts powered by advanced AI algorithms',
-                                  gradient: const [
-                                    Color(0xFFEC4899),
-                                    Color(0xFFF43F5E),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                _buildFeatureItem(
-                                  icon: Icons.auto_awesome_rounded,
-                                  title: 'Context-Aware AI',
-                                  description:
-                                      'Experience intelligent responses with our Retrieval-Augmented Generation model',
-                                  gradient: const [
-                                    Color(0xFF10B981),
-                                    Color(0xFF3B82F6),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                _buildFeatureItem(
-                                  icon: Icons.mic_rounded,
-                                  title: 'Voice Interaction',
-                                  description:
-                                      'Communicate naturally with AI using our advanced voice assistant technology',
-                                  gradient: const [
-                                    Color(0xFFEC4899),
-                                    Color(0xFFF43F5E),
-                                  ],
-                                ),
+                                    child: const Icon(
+                                      Icons.rocket_launch_rounded,
+                                      size: 48,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
 
                           const SizedBox(height: 40),
 
-                          // Quick Stats
-                          isMobile
-                              ? Column(
+                          // AI Models Section
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Your AI Models',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E293B),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    _buildStatCard(
-                                      '4',
-                                      'AI Models',
-                                      Icons.psychology_rounded,
-                                      const [
-                                        Color(0xFF6366F1),
-                                        Color(0xFF8B5CF6),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _buildStatCard(
-                                      '24/7',
-                                      'Availability',
-                                      Icons.access_time_rounded,
-                                      const [
-                                        Color(0xFF8B5CF6),
-                                        Color(0xFFEC4899),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _buildStatCard(
-                                      '∞',
-                                      'Possibilities',
-                                      Icons.all_inclusive_rounded,
-                                      const [
-                                        Color(0xFF10B981),
-                                        Color(0xFF3B82F6),
-                                      ],
-                                    ),
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildStatCard(
-                                        '4',
-                                        'AI Models',
-                                        Icons.psychology_rounded,
-                                        const [
-                                          Color(0xFF6366F1),
-                                          Color(0xFF8B5CF6),
-                                        ],
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: _buildStatCard(
-                                        '24/7',
-                                        'Availability',
-                                        Icons.access_time_rounded,
-                                        const [
-                                          Color(0xFF8B5CF6),
-                                          Color(0xFFEC4899),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: _buildStatCard(
-                                        '∞',
-                                        'Possibilities',
-                                        Icons.all_inclusive_rounded,
-                                        const [
-                                          Color(0xFF10B981),
-                                          Color(0xFF3B82F6),
-                                        ],
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      '4 Available',
+                                      style: TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Model Grid - Enhanced Cards
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: isMobile ? 1 : 2,
+                                  crossAxisSpacing: 20,
+                                  mainAxisSpacing: 20,
+                                  childAspectRatio: isMobile ? 2.5 : 2.8,
+                                ),
+                            itemCount: _models.length,
+                            itemBuilder: (context, index) {
+                              return _buildEnhancedModelCard(_models[index]);
+                            },
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          // Voice Assistant Quick Access
+                          InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const VoiceAssistantScreen(),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFEC4899),
+                                    Color(0xFFF43F5E),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFFEC4899,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: const Icon(
+                                      Icons.mic_rounded,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Voice Assistant',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Ask questions using your voice',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          // Recent Activity
+                          const Text(
+                            'Recent Activity',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF334155),
+                              ),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _recentActivity.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(
+                                    color: Color(0xFF334155),
+                                    height: 1,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final activity = _recentActivity[index];
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: (activity['color'] as Color)
+                                          .withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      activity['icon'] as IconData,
+                                      color: activity['color'] as Color,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    activity['model'] as String,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    activity['action'] as String,
+                                    style: const TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    activity['time'] as String,
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -414,7 +641,6 @@ class _HomeScreenState extends State<HomeScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                          // Profile Picture (temporary placeholder)
                           Container(
                             width: 80,
                             height: 80,
@@ -439,10 +665,7 @@ class _HomeScreenState extends State<HomeScreen>
                               size: 40,
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Welcome text
                           const Text(
                             'Welcome',
                             style: TextStyle(
@@ -450,10 +673,7 @@ class _HomeScreenState extends State<HomeScreen>
                               fontSize: 14,
                             ),
                           ),
-
                           const SizedBox(height: 4),
-
-                          // Username
                           Text(
                             user?.email?.split('@')[0] ?? 'User',
                             style: const TextStyle(
@@ -464,10 +684,7 @@ class _HomeScreenState extends State<HomeScreen>
                             textAlign: TextAlign.center,
                             overflow: TextOverflow.ellipsis,
                           ),
-
                           const SizedBox(height: 8),
-
-                          // Email
                           Text(
                             user?.email ?? '',
                             style: const TextStyle(
@@ -483,7 +700,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                     const SizedBox(height: 32),
 
-                    // Divider
                     Container(
                       height: 1,
                       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -500,159 +716,15 @@ class _HomeScreenState extends State<HomeScreen>
 
                     const SizedBox(height: 24),
 
-                    // AI Models Section
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          // AI Models Button
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isModelsExpanded = !_isModelsExpanded;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF334155).withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFF475569),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFF6366F1),
-                                          Color(0xFF8B5CF6),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.psychology_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Expanded(
-                                    child: Text(
-                                      'AI Models',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  AnimatedRotation(
-                                    turns: _isModelsExpanded ? 0.5 : 0,
-                                    duration: const Duration(milliseconds: 300),
-                                    child: const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Expandable Models List
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            child: _isModelsExpanded
-                                ? Column(
-                                    children: [
-                                      const SizedBox(height: 8),
-                                      ..._models.map(
-                                        (model) => _buildModelItem(model),
-                                      ),
-                                    ],
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
+                    // AI Models List
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: _models
+                            .map((model) => _buildSidebarModelItem(model))
+                            .toList(),
                       ),
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Voice Assistant Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: InkWell(
-                        onTap: () {
-                          _toggleSidebar();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const VoiceAssistantScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFEC4899), Color(0xFFF43F5E)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFEC4899).withOpacity(0.4),
-                                blurRadius: 15,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.mic_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Voice Assistant',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(),
 
                     // Logout Button
                     Padding(
@@ -711,138 +783,119 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildModelItem(AIModel model) {
-    // Map model names to their screens
-    Widget? screen;
-    if (model.name == 'CNN Model') {
-      screen = const CNNScreen();
-    } else if (model.name == 'ANN Model') {
-      screen = const ANNScreen();
-    } else if (model.name == 'Stock Prediction') {
-      screen = const LSTMScreen();
-    } else if (model.name == 'RAG Model') {
-      screen = const RAGScreen();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: InkWell(
-        onTap: () {
-          if (screen != null) {
-            _toggleSidebar();
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => screen!),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${model.name} coming soon!'),
-                backgroundColor: model.gradient[0],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+  Widget _buildEnhancedModelCard(AIModel model) {
+    return InkWell(
+      onTap: () => _navigateToModel(model.name),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF334155)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: model.gradient),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: model.gradient[0].withOpacity(0.4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            );
-          }
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(model.icon, color: model.gradient[0], size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      model.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+              child: Icon(model.icon, color: Colors.white, size: 32),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    model.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(
-                      model.description,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 11,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    model.description,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 14,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: model.gradient[0].withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.speed_rounded,
+                              color: model.gradient[0],
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${model.usageCount} uses',
+                              style: TextStyle(
+                                color: model.gradient[0],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: const Color(0xFF94A3B8),
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureItem({
-    required IconData icon,
-    required String title,
-    required String description,
-    required List<Color> gradient,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: gradient),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF94A3B8),
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildStatCard(
-    String value,
     String label,
+    String value,
     IconData icon,
     List<Color> gradient,
   ) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: gradient),
         borderRadius: BorderRadius.circular(16),
@@ -855,8 +908,9 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 32),
+          Icon(icon, color: Colors.white, size: 28),
           const SizedBox(height: 12),
           Text(
             value,
@@ -878,6 +932,66 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+
+  Widget _buildSidebarModelItem(AIModel model) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          _toggleSidebar();
+          _navigateToModel(model.name);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF334155).withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: model.gradient),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(model.icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      model.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${model.usageCount} uses',
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Color(0xFF94A3B8),
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AIModel {
@@ -885,11 +999,13 @@ class AIModel {
   final String description;
   final IconData icon;
   final List<Color> gradient;
+  final int usageCount;
 
   AIModel({
     required this.name,
     required this.description,
     required this.icon,
     required this.gradient,
+    this.usageCount = 0,
   });
 }
